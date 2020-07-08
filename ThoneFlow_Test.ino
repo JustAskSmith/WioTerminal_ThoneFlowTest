@@ -15,10 +15,11 @@
 #define VECTOR_CENTER_Y 120
 #define VECTOR_MAX_DELTA 118  // maximum X or Y displacement of the movement vector to stay on screen
 #define SCALE 5 // sensitivity for drawing the vector
+#define SPIKE_FILTER // uncomment to use a filter to remove spikes above SPIKE_SIZE times bigger than the last reading
+#define SPIKE_SIZE 1.7
 
 uint8_t data [9]; //  holds one frame of bytes from the serial input
 int16_t xMotion, yMotion;
-int test;
 uint8_t surfaceQuality;
 
 
@@ -91,16 +92,18 @@ void loop()
         }
       }
       processFrame();
-      Serial.print(xMotion);
-      Serial.print(",");
-      Serial.println(yMotion);
-
       drawVector(xMotion, yMotion, SCALE);
    }
 }
 
 void processFrame()
 {
+  #ifdef SPIKE_FILTER
+    static double lastX,lastY;
+  #endif
+  
+  int16_t thisX,thisY;
+
   // check for proper header/footer framing
   if (data[8] != FOOTER_BYTE)  
   {
@@ -131,21 +134,48 @@ void processFrame()
   } 
 
    // tests passed we have a valid frame
-   xMotion = ((int16_t)data[3] << 8) | data[2];
-   yMotion = ((int16_t)data[5] << 8) | data[4];
-  
+  thisX = ((int16_t)data[3] << 8) | data[2];
+  thisY = ((int16_t)data[5] << 8) | data[4];
+ 
+  #ifdef SPIKE_FILTER
+    if ((abs(thisX) > (abs(lastX) * SPIKE_SIZE)) && (abs(lastX) > 0))
+    {
+      xMotion = lastX;
+    }
+    else
+    {
+      xMotion = thisX;
+    }
+    
+
+    if ((abs(thisY) > (abs(lastY) * SPIKE_SIZE)) && (abs(lastY) > 0))
+    {
+      yMotion = lastY;
+    }
+    else
+    {
+      yMotion - thisY;
+    }
+    
+    
+    lastX = (double)thisX;
+    lastY = (double)thisY;
+
+  #endif
+
+
    surfaceQuality = data[7];
 
   
   #ifdef SERIAL_OUTPUT
-    // serialPrintFrame();
-    // Serial.println();
-    // Serial.print("X Motion= ");
-    // Serial.println(xMotion);
-    // Serial.print("Y Motion= ");
-    // Serial.println(yMotion);
-    // Serial.print("Surface quality= ");
-    // Serial.println(surfaceQuality);
+    serialPrintFrame();
+    Serial.println();
+    Serial.print("X Motion= ");
+    Serial.println(xMotion);
+    Serial.print("Y Motion= ");
+    Serial.println(yMotion);
+    Serial.print("Surface quality= ");
+    Serial.println(surfaceQuality);
   #endif
 }
 
