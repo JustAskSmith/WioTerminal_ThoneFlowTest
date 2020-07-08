@@ -5,18 +5,27 @@
 */
 
 #include <wiring_private.h>
+#include <TFT_eSPI.h>
 
 #define SERIAL_OUTPUT
 #define SERIAL3_BAUD 19200
 #define HEADER_BYTE 0xFE
 #define FOOTER_BYTE 0xAA
+#define VECTOR_CENTER_X 160 // center point for the movement vector
+#define VECTOR_CENTER_Y 120
+#define VECTOR_MAX_DELTA 118  // maximum X or Y displacement of the movement vector to stay on screen
+#define SCALE 5 // sensitivity for drawing the vector
 
-uint8_t data[8]; //  holds one frame of bytes from the serial input
+uint8_t data [9]; //  holds one frame of bytes from the serial input
 int16_t xMotion, yMotion;
+int test;
 uint8_t surfaceQuality;
+
 
 // reassign sercom3 as a UART using the I2C pins on the left Grove connector
 static Uart Serial3(&sercom3, PIN_WIRE_SCL, PIN_WIRE_SDA, SERCOM_RX_PAD_1, UART_TX_PAD_0);
+
+TFT_eSPI tft = TFT_eSPI();
 
 void SERCOM3_0_Handler()
 {
@@ -52,7 +61,12 @@ void setup()
   pinPeripheral(PIN_WIRE_SCL, PIO_SERCOM_ALT);
   pinPeripheral(PIN_WIRE_SDA, PIO_SERCOM_ALT);
   // Serial.println("Pin maps set");
-}
+  
+  // intialize display
+  tft.begin();
+  tft.setRotation(3);
+  tft.fillScreen(TFT_BLACK);
+ }
 
 void loop()
  {
@@ -68,7 +82,7 @@ void loop()
         data[i] = inbyte;
         for (i=1; i < 9; i++)
         {
-          while(!Serial3.available()) // only wait 500 milliseconds for the next byte
+          while(!Serial3.available())
           {
 
           }
@@ -76,8 +90,12 @@ void loop()
           data[i] = inbyte;
         }
       }
+      processFrame();
+      Serial.print(xMotion);
+      Serial.print(",");
+      Serial.println(yMotion);
 
-      processFrame();  
+      drawVector(xMotion, yMotion, SCALE);
    }
 }
 
@@ -85,7 +103,6 @@ void processFrame()
 {
   // check for proper header/footer framing
   if (data[8] != FOOTER_BYTE)  
-  
   {
     #ifdef SERIAL_OUTPUT
       Serial.print("Bad frame detected ");
@@ -112,33 +129,55 @@ void processFrame()
     #endif  
     return;
   } 
-  // tests passed we have a valid frame
-  xMotion = (data[2] << 8) | data[3];
-  yMotion = (data[4] << 8) | data[5];
-  surfaceQuality =  data[7];
+
+   // tests passed we have a valid frame
+   xMotion = ((int16_t)data[3] << 8) | data[2];
+   yMotion = ((int16_t)data[5] << 8) | data[4];
+  
+   surfaceQuality = data[7];
+
   
   #ifdef SERIAL_OUTPUT
-    Serial.print("X Motion= ");
-    Serial.println(xMotion);
-    Serial.print("Y Motion= ");
-    Serial.println(yMotion);
-    Serial.print("Surface quality= ");
-    Serial.println(surfaceQuality);
+    // serialPrintFrame();
+    // Serial.println();
+    // Serial.print("X Motion= ");
+    // Serial.println(xMotion);
+    // Serial.print("Y Motion= ");
+    // Serial.println(yMotion);
+    // Serial.print("Surface quality= ");
+    // Serial.println(surfaceQuality);
   #endif
 }
 
 bool testChecksum()
 {
-    return true;
+  uint8_t sum = 0;
+  sum = data[2] + data[3] + data[4] + data[5];
+  return (sum == data[6]);
 }
 
 void serialPrintFrame()
 {
-  int i;
-  for (i=0; i < 9; i++)
+  int j;
+  for (j=0; j < 9; j++)
   {
-    Serial.print(data[i]);
+    Serial.printf("%02X", data[j]);
     Serial.print(" ");
   }
 
+}
+
+void drawVector(int xMotion, int yMotion, int scale)
+{
+  static int lastX = 0, lastY = 0;
+  
+  if (lastX) // don't run for the very first call of this function
+  {
+    tft.drawLine(VECTOR_CENTER_X, VECTOR_CENTER_Y, lastX, lastY,TFT_BLACK); // erase the last line
+  }
+
+  lastX = constrain(VECTOR_CENTER_X + int(xMotion * scale), VECTOR_CENTER_X - VECTOR_MAX_DELTA, VECTOR_CENTER_X + VECTOR_MAX_DELTA); // constrain to screen space
+  lastY = constrain(VECTOR_CENTER_Y + int(yMotion * scale), VECTOR_CENTER_Y - VECTOR_MAX_DELTA, VECTOR_CENTER_Y + VECTOR_MAX_DELTA);
+
+  tft.drawLine(VECTOR_CENTER_X, VECTOR_CENTER_Y, lastX, lastY,TFT_WHITE);
 }
