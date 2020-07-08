@@ -7,7 +7,7 @@
 #include <wiring_private.h>
 #include <TFT_eSPI.h>
 
-#define SERIAL_OUTPUT
+// #define SERIAL_OUTPUT  //Uncomment to send sensor data to the USB serial port also
 #define SERIAL3_BAUD 19200
 #define HEADER_BYTE 0xFE
 #define FOOTER_BYTE 0xAA
@@ -15,7 +15,7 @@
 #define VECTOR_CENTER_Y 120
 #define VECTOR_MAX_DELTA 118  // maximum X or Y displacement of the movement vector to stay on screen
 #define SCALE 5 // sensitivity for drawing the vector
-#define SPIKE_FILTER // uncomment to use a filter to remove spikes above SPIKE_SIZE times bigger than the last reading
+#define SPIKE_FILTER // uncomment to remove spikes above SPIKE_SIZE times bigger than the last reading
 #define SPIKE_SIZE 1.7
 
 uint8_t data [9]; //  holds one frame of bytes from the serial input
